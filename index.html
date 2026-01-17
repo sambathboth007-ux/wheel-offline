@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline Wheel</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 20px; background: #f0f2f5; }
+        #wheel-container { position: relative; margin: 20px auto; width: 320px; height: 320px; }
+        canvas { width: 100%; height: 100%; border: 6px solid #333; border-radius: 50%; background: white; box-shadow: 0 10px 20px rgba(0,0,0,0.2); transition: transform 4s cubic-bezier(0.1, 0, 0.2, 1); }
+        
+        #pointer { 
+            position: absolute; top: -15px; left: 50%; transform: translateX(-50%); 
+            width: 0; height: 0; border-left: 20px solid transparent; 
+            border-right: 20px solid transparent; border-top: 35px solid #d9534f; 
+            z-index: 10;
+        }
+
+        textarea { width: 90%; max-width: 400px; height: 100px; margin: 20px 0; padding: 12px; border-radius: 10px; border: 2px solid #ddd; font-size: 16px; }
+        .spin-btn { padding: 15px 50px; font-size: 1.5rem; background: #28a745; color: white; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; }
+        .spin-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* Popup Styles */
+        #winner-popup {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7); z-index: 100; justify-content: center; align-items: center;
+        }
+        .popup-content {
+            background: white; padding: 40px; border-radius: 20px; text-align: center;
+            width: 85%; max-width: 450px; animation: popIn 0.3s ease-out;
+        }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        #winner-name { font-size: 4rem; font-weight: 800; color: #333; margin: 10px 0; }
+        .selected-label { font-size: 1.4rem; color: #888; margin-bottom: 20px; }
+        .btn-row { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+        .p-btn { flex: 1; padding: 15px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        .hide-btn { background: #eee; color: #444; }
+        .done-btn { background: #ffc107; color: #fff; }
+    </style>
+</head>
+<body>
+
+    <h2>វង្វិលឈ្មោះរេនដឹម😂</h2>
+    
+    <div id="wheel-container">
+        <div id="pointer"></div>
+        <canvas id="wheel" width="800" height="800"></canvas>
+    </div>
+    
+    <textarea id="items" placeholder="Enter names...">1&#10;2&#10;3&#10;4&#10;5&#10;6</textarea><br>
+    <button id="spinBtn" class="spin-btn" onclick="spin()">SPIN!</button>
+
+    <div id="winner-popup">
+        <div class="popup-content">
+            <div id="winner-name">?</div>
+            <div class="selected-label">Selected</div>
+            <div class="btn-row">
+                <button class="p-btn hide-btn" onclick="hideAndRemove()">HIDE CHOICE</button>
+                <button class="p-btn done-btn" onclick="closePopup()">DONE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        const textarea = document.getElementById('items');
+        const popup = document.getElementById('winner-popup');
+        const winnerDisplay = document.getElementById('winner-name');
+        const spinBtn = document.getElementById('spinBtn');
+        
+        let currentRotation = 0;
+        let isSpinning = false;
+        let lastWinner = "";
+
+        function getList() {
+            return textarea.value.split('\n').filter(t => t.trim() !== "");
+        }
+
+        function draw() {
+            const items = getList();
+            if (items.length === 0) {
+                ctx.clearRect(0, 0, 800, 800);
+                return;
+            }
+            const arcSize = (2 * Math.PI) / items.length;
+            ctx.clearRect(0, 0, 800, 800);
+
+            items.forEach((item, i) => {
+                const angle = i * arcSize;
+                ctx.fillStyle = `hsl(${(i * 360) / items.length}, 70%, 50%)`;
+                ctx.beginPath();
+                ctx.moveTo(400, 400);
+                ctx.arc(400, 400, 400, angle, angle + arcSize);
+                ctx.fill();
+
+                ctx.save();
+                ctx.translate(400, 400);
+                ctx.rotate(angle + arcSize / 2);
+                ctx.fillStyle = "white";
+                ctx.font = "bold 40px sans-serif";
+                ctx.textAlign = "right";
+                ctx.fillText(item.slice(0, 15), 350, 15);
+                ctx.restore();
+            });
+        }
+
+        function spin() {
+            if (isSpinning) return;
+            const items = getList();
+            if (items.length < 1) return;
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            const extraSpins = Math.floor(Math.random() * 360) + 2880; 
+            currentRotation += extraSpins;
+            
+            canvas.style.transform = `rotate(${currentRotation}deg)`;
+        }
+
+        canvas.addEventListener('transitionend', () => {
+            isSpinning = false;
+            spinBtn.disabled = false;
+            const items = getList();
+            
+            const actualStopAngle = currentRotation % 360;
+            const arcSizeDeg = 360 / items.length;
+            const winningIndex = Math.floor((360 - actualStopAngle + 270) % 360 / arcSizeDeg);
+            
+            lastWinner = items[winningIndex];
+            winnerDisplay.textContent = lastWinner;
+            popup.style.display = 'flex';
+        });
+
+        function closePopup() {
+            popup.style.display = 'none';
+        }
+
+        // NEW FUNCTION: Removes the winner from the list
+        function hideAndRemove() {
+            let items = getList();
+            // Find the winner in the list and remove them
+            const index = items.indexOf(lastWinner);
+            if (index > -1) {
+                items.splice(index, 1);
+            }
+            
+            // Update the textarea with the remaining names
+            textarea.value = items.join('\n');
+            
+            // Redraw the wheel and close popup
+            draw();
+            closePopup();
+        }
+
+        textarea.addEventListener('input', draw);
+        draw();
+    </script>
+</body>
+</html>
